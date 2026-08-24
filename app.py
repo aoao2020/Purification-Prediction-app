@@ -35,6 +35,36 @@ predictor = load_predictor()
 
 
 # =====================================================
+# Screenshot mode
+# =====================================================
+
+def enable_full_page_screenshot_mode():
+    st.markdown(
+        """
+        <style>
+        html,
+        body,
+        #root,
+        .stApp,
+        [data-testid="stApp"],
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"] {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"] {
+            min-height: 100vh !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =====================================================
 # Display maps
 # =====================================================
 
@@ -321,6 +351,22 @@ st.caption(
     "Predict purification method candidates, solvent system candidates, "
     "and solvent ratios from molecular information."
 )
+
+screenshot_mode = st.toggle(
+    "Full-page screenshot mode",
+    value=False,
+    help=(
+        "Removes Streamlit's internal scrolling so the browser can capture "
+        "the entire page as one image."
+    ),
+)
+
+if screenshot_mode:
+    enable_full_page_screenshot_mode()
+    st.info(
+        "Screenshot mode is active. In Chrome, press Command + Shift + P in "
+        "Developer Tools and select Capture full size screenshot."
+    )
 
 with st.expander("How to use", expanded=False):
     st.write("1. Select a prediction mode.")
