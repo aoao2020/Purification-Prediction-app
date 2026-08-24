@@ -12,9 +12,12 @@ streamlit run app.py
 サイドバーから次のページを選択できます。
 
 - `app`: 精製条件予測
-- `SMILES Drawer`: SMILESの2D構造描画、分子情報表示、SVG/PNG出力
+- `SMILES Toolkit`: SMILESの確認、2D構造描画、分子情報表示、SVG/PNG出力
 
-## SMILES Drawer
+精製条件予測画面では、SMILES入力欄の横にある`Draw`ボタンから構造エディタを開き、
+描画した構造をSMILESとして入力欄へ反映できます。
+
+## SMILES Toolkit
 
 SMILESを入力すると即時に構造を検証・描画します。Canonical SMILES、分子式、分子量、
 精密質量、LogPなどを確認でき、構造図をSVGまたはPNGとして保存できます。

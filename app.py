@@ -5,6 +5,7 @@ from pathlib import Path
 import streamlit as st
 from rdkit import Chem
 from rdkit.Chem.Draw import MolToImage
+from streamlit_ketcher import st_ketcher
 
 from src.predictor import PurificationPredictor
 
@@ -76,6 +77,85 @@ def parse_mol(smiles):
     return mol, canonical
 
 
+@st.dialog("Draw structure", width="large")
+def draw_structure_dialog(*, target_key, editor_key, structure_label):
+    st.markdown(f"**{structure_label}**")
+    st.caption(
+        "Draw or edit the structure, click Apply in the editor, "
+        "then select Use this structure."
+    )
+
+    initial_smiles = clean_text(st.session_state.get(target_key, ""))
+    drawn_smiles = st_ketcher(
+        initial_smiles,
+        key=editor_key,
+        height=520,
+    )
+    drawn_smiles = clean_text(drawn_smiles)
+
+    if drawn_smiles:
+        st.markdown("**Generated SMILES**")
+        st.code(drawn_smiles, language=None, wrap_lines=True)
+
+    accept_col, cancel_col = st.columns([2, 1])
+
+    if accept_col.button(
+        "Use this structure",
+        key=f"accept_{editor_key}",
+        type="primary",
+        use_container_width=True,
+        disabled=not drawn_smiles,
+    ):
+        mol, canonical_smiles = parse_mol(drawn_smiles)
+
+        if mol is None:
+            st.error("The drawn structure could not be converted to a valid SMILES.")
+        else:
+            st.session_state[target_key] = canonical_smiles
+            st.rerun()
+
+    if cancel_col.button(
+        "Cancel",
+        key=f"cancel_{editor_key}",
+        use_container_width=True,
+    ):
+        st.rerun()
+
+
+def smiles_input_with_draw_button(
+    *,
+    label,
+    input_key,
+    placeholder,
+    draw_key,
+    editor_key,
+    column_widths=(7, 1),
+):
+    input_col, draw_col = st.columns(
+        column_widths,
+        vertical_alignment="bottom",
+    )
+
+    smiles = input_col.text_input(
+        label,
+        key=input_key,
+        placeholder=placeholder,
+    )
+
+    if draw_col.button(
+        "Draw",
+        key=draw_key,
+        use_container_width=True,
+    ):
+        draw_structure_dialog(
+            target_key=input_key,
+            editor_key=editor_key,
+            structure_label=label,
+        )
+
+    return smiles
+
+
 def split_solvent_pair(solvent):
     if "/" in str(solvent):
         left, right = str(solvent).split("/", 1)
@@ -91,14 +171,15 @@ def format_ratio(solvent, value):
     value = max(0.0, min(100.0, value))
     other = 100.0 - value
 
-    compact = f"{left}:{right} = {value:.0f}:{other:.0f}"
-    percent = f"{left} {value:.1f}% / {right} {other:.1f}%"
-
-    return compact, percent
+    return f"{left}:{right} = {value:.0f}:{other:.0f}"
 
 
 def is_silica_column_method(method):
     return str(method).strip().lower() == "silica"
+
+
+def is_other_method(method):
+    return str(method).strip().lower() == "other"
 
 
 def is_other_solvent(solvent):
@@ -128,19 +209,14 @@ def display_probability_table(title, df, top_n=None):
 
 
 def display_ratio_for_silica(solvent, ratio_dict):
-    start_compact, start_percent = format_ratio(
+    start_compact = format_ratio(
         solvent,
         ratio_dict["silica_start"],
     )
 
-    end_compact, end_percent = format_ratio(
+    end_compact = format_ratio(
         solvent,
         ratio_dict["silica_end"],
-    )
-
-    tlc_compact, tlc_percent = format_ratio(
-        solvent,
-        ratio_dict["tlc"],
     )
 
     st.markdown(
@@ -148,14 +224,50 @@ def display_ratio_for_silica(solvent, ratio_dict):
     )
 
     st.info(f"**Silica start ratio**: {start_compact}")
-    st.caption(start_percent)
-
     st.info(f"**Silica end ratio**: {end_compact}")
-    st.caption(end_percent)
 
-    with st.expander("Reference values"):
-        st.write(f"**TLC solvent ratio**: {tlc_compact}")
-        st.caption(tlc_percent)
+
+def display_tlc_prediction(
+    *,
+    mode,
+    solvent,
+    solvent_probability_df,
+    product_smiles,
+    reactant_smiles,
+    agents,
+):
+    st.markdown("### TLC prediction")
+
+    solvent_probability_rows = solvent_probability_df[
+        solvent_probability_df["candidate"] == solvent
+    ]
+    solvent_probability = float(solvent_probability_rows.iloc[0]["prob"])
+
+    with st.container(border=True):
+        st.write(
+            f"**Solvent system**: {solvent} ({solvent_probability:.3f})"
+        )
+
+        if is_other_solvent(solvent):
+            st.warning(
+                'TLC ratio prediction is unavailable for "other" solvent systems.'
+            )
+        else:
+            ratio_dict = predictor.predict_ratio(
+                mode=mode,
+                solvent=solvent,
+                product_smiles=product_smiles,
+                reactant_smiles=reactant_smiles,
+                agents=agents,
+            )
+
+            tlc_ratio = format_ratio(solvent, ratio_dict["tlc"])
+            st.info(f"**Predicted TLC solvent ratio**: {tlc_ratio}")
+
+    display_probability_table(
+        title="TLC solvent system",
+        df=solvent_probability_df,
+    )
 
 
 def display_solvent_candidate(
@@ -238,23 +350,34 @@ agents = ""
 selected_agents = []
 
 if mode == "simple":
-    product_smiles = st.text_input(
-        "Product SMILES",
+    product_smiles = smiles_input_with_draw_button(
+        label="Product SMILES",
+        input_key="product_smiles_input",
         placeholder="Example: CCO",
+        draw_key="draw_product_simple",
+        editor_key="product_structure_editor",
     )
 
 else:
     col1, col2 = st.columns(2)
 
     with col1:
-        reactant_smiles = st.text_input(
-            "Reactant SMILES",
+        reactant_smiles = smiles_input_with_draw_button(
+            label="Reactant SMILES",
+            input_key="reactant_smiles_input",
             placeholder="Example: CC=O",
+            draw_key="draw_reactant_complex",
+            editor_key="reactant_structure_editor",
+            column_widths=(5, 1.5),
         )
 
-        product_smiles = st.text_input(
-            "Product SMILES",
+        product_smiles = smiles_input_with_draw_button(
+            label="Product SMILES",
+            input_key="product_smiles_input",
             placeholder="Example: CCO",
+            draw_key="draw_product_complex",
+            editor_key="product_structure_editor",
+            column_widths=(5, 1.5),
         )
 
     with col2:
@@ -327,7 +450,7 @@ if predict_clicked:
             st.error("Failed to parse Reactant SMILES. Please check the input.")
             st.stop()
 
-    left_col, right_col = st.columns([1, 1.45])
+    left_col, right_col = st.columns([1, 2])
 
     with left_col:
         st.subheader("Input summary")
@@ -379,6 +502,32 @@ if predict_clicked:
 
             top_methods = method_prob_df.head(2).reset_index(drop=True)
 
+            # TLC prediction is shown first, using the top-ranked method and
+            # its top-ranked solvent system.
+            if is_other_method(method_pred):
+                st.markdown("### TLC prediction")
+                st.warning(
+                    "TLC and solvent prediction are unavailable when the "
+                    "predicted purification method is Other."
+                )
+            else:
+                tlc_solvent_pred, tlc_solvent_prob_df = predictor.predict_solvent(
+                    mode=mode,
+                    method=method_pred,
+                    product_smiles=product_smiles,
+                    reactant_smiles=reactant_smiles,
+                    agents=agents,
+                )
+
+                display_tlc_prediction(
+                    mode=mode,
+                    solvent=tlc_solvent_pred,
+                    solvent_probability_df=tlc_solvent_prob_df,
+                    product_smiles=product_smiles,
+                    reactant_smiles=reactant_smiles,
+                    agents=agents,
+                )
+
             st.markdown("### Top purification method candidates")
 
             for method_idx, method_row in top_methods.iterrows():
@@ -391,6 +540,13 @@ if predict_clicked:
                         f"## Method candidate {method_idx + 1}: "
                         f"{method_display} ({method_probability:.3f})"
                     )
+
+                    if is_other_method(method_candidate):
+                        st.warning(
+                            "Solvent prediction is unavailable when the "
+                            "purification method is Other."
+                        )
+                        continue
 
                     # -------------------------------------------------
                     # 2. Predict solvent probabilities for each method candidate
@@ -441,13 +597,16 @@ if predict_clicked:
                     "For each method candidate, solvent system candidates are predicted separately."
                 )
                 st.write(
+                    "Solvent and TLC predictions are not available when the predicted method is Other."
+                )
+                st.write(
                     "Silica start and end ratios are displayed only when the predicted method is Silica Column."
                 )
                 st.write(
                     'Ratio prediction is not displayed for "other" solvent systems.'
                 )
                 st.write(
-                    "TLC solvent ratio is shown as a reference value under Silica Column output."
+                    "The TLC solvent ratio uses the top solvent system predicted for the top purification method."
                 )
                 st.write(
                     "Solvent ratios are displayed as A:B = x:y. "

@@ -17,7 +17,7 @@ from src.smiles_drawer import (
 
 
 st.set_page_config(
-    page_title="SMILES Drawer",
+    page_title="SMILES Toolkit",
     page_icon="⌬",
     layout="wide",
 )
@@ -55,18 +55,18 @@ st.markdown(
     """
     <header class="drawer-hero">
       <div class="drawer-kicker">Molecular canvas</div>
-      <div class="drawer-title">SMILES Drawer</div>
-      <div class="drawer-subtitle">SMILESから、確認しやすく保存しやすい2D分子構造を生成します。</div>
+      <div class="drawer-title">SMILES Toolkit</div>
+      <div class="drawer-subtitle">Validate, inspect, visualize, and export molecular structures from SMILES.</div>
     </header>
     """,
     unsafe_allow_html=True,
 )
 
 EXAMPLES = {
-    "アスピリン": "CC(=O)Oc1ccccc1C(=O)O",
-    "カフェイン": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
-    "イブプロフェン": "CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O",
-    "ニコチン": "CN1CCC[C@H]1c2cccnc2",
+    "Aspirin": "CC(=O)Oc1ccccc1C(=O)O",
+    "Caffeine": "Cn1c(=O)c2c(ncn2C)n(C)c1=O",
+    "Ibuprofen": "CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O",
+    "Nicotine": "CN1CCC[C@H]1c2cccnc2",
 }
 
 
@@ -75,11 +75,11 @@ def load_example(example_smiles: str) -> None:
 
 
 if "drawer_smiles" not in st.session_state:
-    st.session_state.drawer_smiles = EXAMPLES["アスピリン"]
+    st.session_state.drawer_smiles = EXAMPLES["Aspirin"]
 
 input_method = st.radio(
-    "入力方法",
-    ["SMILESを入力", "ChemDrawファイルを読み込む"],
+    "Input method",
+    ["Enter SMILES", "Upload a ChemDraw file"],
     horizontal=True,
 )
 
@@ -90,13 +90,16 @@ input_error = None
 uploaded_file = None
 
 with input_col:
-    if input_method == "SMILESを入力":
+    if input_method == "Enter SMILES":
         smiles = st.text_area(
             "SMILES",
             key="drawer_smiles",
             height=112,
-            placeholder="例: CC(=O)Oc1ccccc1C(=O)O",
-            help="標準SMILES、立体化学を含むisomeric SMILES、複数成分を含むSMILESに対応します。",
+            placeholder="Example: CC(=O)Oc1ccccc1C(=O)O",
+            help=(
+                "Supports standard SMILES, isomeric SMILES with stereochemistry, "
+                "and multi-component SMILES."
+            ),
         )
 
         example_cols = st.columns(len(EXAMPLES))
@@ -115,11 +118,14 @@ with input_col:
 
     else:
         uploaded_file = st.file_uploader(
-            "ChemDrawから保存したファイル",
+            "File exported from ChemDraw",
             type=["cdxml", "mol", "sdf"],
-            help="おすすめはCDXMLです。複数構造を扱う場合はCDXMLまたはSDFを使用してください。",
+            help=(
+                "CDXML is recommended. Use CDXML or SDF for files containing "
+                "multiple structures."
+            ),
         )
-        st.caption("対応形式: CDXML・MOL・SDF（最大10 MB）")
+        st.caption("Supported formats: CDXML, MOL, and SDF (maximum 10 MB)")
 
         if uploaded_file is not None:
             try:
@@ -130,19 +136,21 @@ with input_col:
                 selected_index = 0
                 if len(imported_molecules) > 1:
                     selected_index = st.selectbox(
-                        "変換する構造",
+                        "Structure to convert",
                         options=range(len(imported_molecules)),
                         format_func=lambda index: imported_molecules[index].name,
                     )
-                    st.caption(f"{len(imported_molecules)}件の構造を検出しました。")
+                    st.caption(
+                        f"Detected {len(imported_molecules)} structures."
+                    )
                     structure_rows = [
                         {
-                            "構造名": item.name,
+                            "Structure name": item.name,
                             "Isomeric SMILES": summarize_molecule(item.mol).canonical_smiles,
                         }
                         for item in imported_molecules
                     ]
-                    with st.expander("検出した構造の一覧"):
+                    with st.expander("Detected structures"):
                         st.dataframe(
                             structure_rows,
                             use_container_width=True,
@@ -151,12 +159,12 @@ with input_col:
                         csv_buffer = StringIO()
                         writer = csv.DictWriter(
                             csv_buffer,
-                            fieldnames=["構造名", "Isomeric SMILES"],
+                            fieldnames=["Structure name", "Isomeric SMILES"],
                         )
                         writer.writeheader()
                         writer.writerows(structure_rows)
                         st.download_button(
-                            "全構造のSMILESをCSVで保存",
+                            "Download all structures as CSV",
                             data=csv_buffer.getvalue().encode("utf-8-sig"),
                             file_name="structures_smiles.csv",
                             mime="text/csv",
@@ -167,20 +175,20 @@ with input_col:
                 input_error = str(exc)
 
 with option_col:
-    st.markdown("**表示オプション**")
-    atom_indices = st.toggle("原子番号を表示", value=False)
-    bond_indices = st.toggle("結合番号を表示", value=False)
-    monochrome = st.toggle("モノクロ", value=False)
+    st.markdown("**Display options**")
+    atom_indices = st.toggle("Show atom indices", value=False)
+    bond_indices = st.toggle("Show bond indices", value=False)
+    monochrome = st.toggle("Monochrome", value=False)
     export_scale = st.select_slider(
-        "書き出し解像度",
-        options=["標準", "高解像度", "特大"],
-        value="高解像度",
+        "Export resolution",
+        options=["Standard", "High resolution", "Extra large"],
+        value="High resolution",
     )
 
 sizes = {
-    "標準": (720, 448),
-    "高解像度": (1200, 746),
-    "特大": (1800, 1120),
+    "Standard": (720, 448),
+    "High resolution": (1200, 746),
+    "Extra large": (1800, 1120),
 }
 export_width, export_height = sizes[export_scale]
 
@@ -203,7 +211,7 @@ if mol is not None:
         monochrome=monochrome,
     )
 
-    st.success("有効なSMILESです", icon="✅")
+    st.success("Valid SMILES", icon="✅")
     canvas_col, detail_col = st.columns([1.65, 1], gap="large")
 
     with canvas_col:
@@ -225,14 +233,14 @@ if mol is not None:
         )
         download_left, download_right = st.columns(2)
         download_left.download_button(
-            "SVGを保存",
+            "Download SVG",
             data=export_svg.encode("utf-8"),
             file_name="molecule.svg",
             mime="image/svg+xml",
             use_container_width=True,
         )
         download_right.download_button(
-            "PNGを保存",
+            "Download PNG",
             data=png_bytes,
             file_name="molecule.png",
             mime="image/png",
@@ -240,27 +248,27 @@ if mol is not None:
         )
 
     with detail_col:
-        st.markdown("### 分子情報")
+        st.markdown("### Molecular information")
         st.markdown(
             f'<div class="formula">{html.escape(summary.formula)}</div>',
             unsafe_allow_html=True,
         )
-        st.caption("分子式")
+        st.caption("Molecular formula")
 
         metric_a, metric_b = st.columns(2)
-        metric_a.metric("分子量", f"{summary.molecular_weight:.2f}")
-        metric_b.metric("精密質量", f"{summary.exact_mass:.4f}")
-        metric_a.metric("重原子数", summary.heavy_atom_count)
-        metric_b.metric("環の数", summary.ring_count)
+        metric_a.metric("Molecular weight", f"{summary.molecular_weight:.2f}")
+        metric_b.metric("Exact mass", f"{summary.exact_mass:.4f}")
+        metric_a.metric("Heavy atoms", summary.heavy_atom_count)
+        metric_b.metric("Rings", summary.ring_count)
         metric_a.metric("HBD", summary.h_bond_donors)
         metric_b.metric("HBA", summary.h_bond_acceptors)
         metric_a.metric("LogP", f"{summary.logp:.2f}")
-        metric_b.metric("全原子数", summary.atom_count)
+        metric_b.metric("Total atoms", summary.atom_count)
 
         st.markdown("#### Canonical SMILES")
         st.code(summary.canonical_smiles, language=None, wrap_lines=True)
         st.download_button(
-            "Canonical SMILESを保存",
+            "Download Canonical SMILES",
             data=(summary.canonical_smiles + "\n").encode("utf-8"),
             file_name="molecule.smi",
             mime="chemical/x-daylight-smiles",
@@ -269,29 +277,31 @@ if mol is not None:
 
 elif input_error:
     st.error(input_error, icon="⚠️")
-    if input_method == "SMILESを入力":
+    if input_method == "Enter SMILES":
         st.markdown(
             """
-            **チェックポイント**
+            **Things to check**
 
-            - 開き括弧と閉じ括弧の数が合っているか
-            - 環を表す番号が対になっているか
-            - `Cl`、`Br`などの原子記号の大文字・小文字が正しいか
-            - 電荷や同位体を表す角括弧 `[]` が閉じているか
+            - Opening and closing parentheses are balanced
+            - Ring closure numbers occur in pairs
+            - Element symbols such as `Cl` and `Br` use the correct capitalization
+            - Square brackets `[]` for charges or isotopes are closed
             """
         )
-elif input_method == "ChemDrawファイルを読み込む":
+elif input_method == "Upload a ChemDraw file":
     st.info(
-        "ChemDrawで構造を選び、ファイル → 別名で保存からCDXML形式で保存してアップロードしてください。",
+        "In ChemDraw, select the structure and use File > Save As to export it "
+        "as a CDXML file, then upload it here.",
         icon="📄",
     )
 
-with st.expander("このツールについて"):
+with st.expander("About this tool"):
     st.write(
-        "構造の解釈・正規化・物性計算・2D座標生成にはRDKitを使用しています。"
-        "表示結果は研究上の確認用として利用し、重要な判断では原典や分析結果と照合してください。"
+        "RDKit is used for structure parsing, normalization, property calculation, "
+        "and 2D coordinate generation. Use the results for research review and "
+        "verify important decisions against primary sources or analytical data."
     )
     st.caption(
-        "CDXMLはChemDrawの全機能を完全には表現できない場合があります。"
-        "変換後の立体化学・電荷・結合次数をプレビューで確認してください。"
+        "CDXML may not preserve every ChemDraw feature. Review the converted "
+        "stereochemistry, charges, and bond orders in the preview."
     )

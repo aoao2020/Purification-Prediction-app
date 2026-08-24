@@ -51,18 +51,18 @@ def _display_name(mol: Chem.Mol, index: int) -> str:
         name = mol.GetProp("_Name").strip()
         if name:
             return name
-    return f"構造 {index + 1}"
+    return f"Structure {index + 1}"
 
 
 def load_structure_file(filename: str, data: bytes) -> list[ImportedMolecule]:
     """Load one or more molecules from a ChemDraw-compatible text format."""
     suffix = Path(filename or "").suffix.lower()
     if suffix not in SUPPORTED_STRUCTURE_FORMATS:
-        raise ValueError("対応形式は CDXML、MOL、SDF です。")
+        raise ValueError("Supported formats are CDXML, MOL, and SDF.")
     if not data:
-        raise ValueError("ファイルが空です。")
+        raise ValueError("The uploaded file is empty.")
     if len(data) > MAX_STRUCTURE_FILE_SIZE:
-        raise ValueError("ファイルサイズは10 MB以下にしてください。")
+        raise ValueError("The file size must not exceed 10 MB.")
 
     try:
         if suffix == ".cdxml":
@@ -91,11 +91,12 @@ def load_structure_file(filename: str, data: bytes) -> list[ImportedMolecule]:
             mols = [mol for mol in supplier if mol is not None]
     except (RuntimeError, ValueError) as exc:
         raise ValueError(
-            "構造を読み取れませんでした。ChemDrawからCDXMLまたはMOLとして保存し直してください。"
+            "The structure could not be read. Export it again from ChemDraw "
+            "as a CDXML or MOL file."
         ) from exc
 
     if not mols:
-        raise ValueError("ファイル内に読み取り可能な分子構造がありません。")
+        raise ValueError("No readable molecular structures were found in the file.")
 
     return [
         ImportedMolecule(name=_display_name(mol, index), mol=mol)
@@ -107,11 +108,14 @@ def parse_smiles(smiles: str) -> Chem.Mol:
     """Parse a SMILES string and raise a user-facing error if it is invalid."""
     value = str(smiles or "").strip()
     if not value:
-        raise ValueError("SMILESを入力してください。")
+        raise ValueError("Enter a SMILES string.")
 
     mol = Chem.MolFromSmiles(value)
     if mol is None:
-        raise ValueError("SMILESを解釈できません。括弧、環番号、原子記号を確認してください。")
+        raise ValueError(
+            "The SMILES string could not be parsed. Check parentheses, ring numbers, "
+            "and element symbols."
+        )
 
     # Generate stable 2D coordinates once so every export has the same layout.
     AllChem.Compute2DCoords(mol)
