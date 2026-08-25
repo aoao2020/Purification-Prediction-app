@@ -208,6 +208,56 @@ def display_probability_table(title, df, top_n=None):
         )
 
 
+def candidate_probability(probability_df, candidate):
+    rows = probability_df[probability_df["candidate"] == candidate]
+
+    if rows.empty:
+        return None
+
+    return float(rows.iloc[0]["prob"])
+
+
+def display_prediction_summary(
+    *,
+    method,
+    method_probability,
+    solvent=None,
+    solvent_probability=None,
+    tlc_ratio=None,
+):
+    st.markdown("## Prediction summary")
+
+    method_col, solvent_col, tlc_col = st.columns(3)
+
+    with method_col:
+        with st.container(border=True):
+            st.caption("Top purification method")
+            st.markdown(f"### {display_method_name(method)}")
+            st.caption(f"Probability: {method_probability:.3f}")
+
+    with solvent_col:
+        with st.container(border=True):
+            st.caption("Top solvent system")
+
+            if solvent is None:
+                st.markdown("### Not available")
+                st.caption("Method was predicted as Other")
+            else:
+                st.markdown(f"### {solvent}")
+                st.caption(f"Probability: {solvent_probability:.3f}")
+
+    with tlc_col:
+        with st.container(border=True):
+            st.caption("Predicted TLC ratio")
+
+            if tlc_ratio is None:
+                st.markdown("### Not available")
+                st.caption("No ratio prediction is available")
+            else:
+                st.markdown(f"### {tlc_ratio}")
+                st.caption("Rounded solvent ratio")
+
+
 def display_ratio_for_silica(solvent, ratio_dict):
     start_compact = format_ratio(
         solvent,
@@ -231,6 +281,7 @@ def display_tlc_prediction(
     product_smiles,
     reactant_smiles,
     agents,
+    ratio_dict=None,
 ):
     st.markdown("### TLC prediction")
 
@@ -249,13 +300,14 @@ def display_tlc_prediction(
                 'TLC ratio prediction is unavailable for "other" solvent systems.'
             )
         else:
-            ratio_dict = predictor.predict_ratio(
-                mode=mode,
-                solvent=solvent,
-                product_smiles=product_smiles,
-                reactant_smiles=reactant_smiles,
-                agents=agents,
-            )
+            if ratio_dict is None:
+                ratio_dict = predictor.predict_ratio(
+                    mode=mode,
+                    solvent=solvent,
+                    product_smiles=product_smiles,
+                    reactant_smiles=reactant_smiles,
+                    agents=agents,
+                )
 
             tlc_ratio = format_ratio(solvent, ratio_dict["tlc"])
             st.info(f"**Predicted TLC solvent ratio**: {tlc_ratio}")
@@ -275,6 +327,7 @@ def display_solvent_candidate(
     product_smiles,
     reactant_smiles,
     agents,
+    ratio_dict=None,
 ):
     with st.container(border=True):
         st.markdown(
@@ -293,13 +346,14 @@ def display_solvent_candidate(
             )
             return
 
-        ratio_dict = predictor.predict_ratio(
-            mode=mode,
-            solvent=solvent_candidate,
-            product_smiles=product_smiles,
-            reactant_smiles=reactant_smiles,
-            agents=agents,
-        )
+        if ratio_dict is None:
+            ratio_dict = predictor.predict_ratio(
+                mode=mode,
+                solvent=solvent_candidate,
+                product_smiles=product_smiles,
+                reactant_smiles=reactant_smiles,
+                agents=agents,
+            )
 
         display_ratio_for_silica(
             solvent=solvent_candidate,
@@ -451,6 +505,69 @@ if predict_clicked:
             st.error("Failed to parse Reactant SMILES. Please check the input.")
             st.stop()
 
+    try:
+        # -------------------------------------------------
+        # Generate the primary predictions for the summary
+        # -------------------------------------------------
+        method_pred, method_prob_df = predictor.predict_method(
+            mode=mode,
+            product_smiles=product_smiles,
+            reactant_smiles=reactant_smiles,
+            agents=agents,
+        )
+        method_probability = candidate_probability(
+            method_prob_df,
+            method_pred,
+        )
+        top_methods = method_prob_df.head(2).reset_index(drop=True)
+
+        tlc_solvent_pred = None
+        tlc_solvent_prob_df = None
+        tlc_solvent_probability = None
+        tlc_ratio_dict = None
+        tlc_ratio_summary = None
+
+        if not is_other_method(method_pred):
+            tlc_solvent_pred, tlc_solvent_prob_df = predictor.predict_solvent(
+                mode=mode,
+                method=method_pred,
+                product_smiles=product_smiles,
+                reactant_smiles=reactant_smiles,
+                agents=agents,
+            )
+            tlc_solvent_probability = candidate_probability(
+                tlc_solvent_prob_df,
+                tlc_solvent_pred,
+            )
+
+            if not is_other_solvent(tlc_solvent_pred):
+                tlc_ratio_dict = predictor.predict_ratio(
+                    mode=mode,
+                    solvent=tlc_solvent_pred,
+                    product_smiles=product_smiles,
+                    reactant_smiles=reactant_smiles,
+                    agents=agents,
+                )
+                tlc_ratio_summary = format_ratio(
+                    tlc_solvent_pred,
+                    tlc_ratio_dict["tlc"],
+                )
+
+        display_prediction_summary(
+            method=method_pred,
+            method_probability=method_probability,
+            solvent=tlc_solvent_pred,
+            solvent_probability=tlc_solvent_probability,
+            tlc_ratio=tlc_ratio_summary,
+        )
+
+    except Exception as e:
+        st.error("An error occurred during prediction.")
+        st.exception(e)
+        st.stop()
+
+    st.markdown("## Detailed results")
+
     left_col, right_col = st.columns([1, 2])
 
     with left_col:
@@ -488,21 +605,9 @@ if predict_clicked:
                 st.warning("Reactant molecular structure could not be generated.")
 
     with right_col:
-        st.subheader("Prediction results")
+        st.subheader("Prediction details")
 
         try:
-            # -------------------------------------------------
-            # 1. Predict method probabilities
-            # -------------------------------------------------
-            method_pred, method_prob_df = predictor.predict_method(
-                mode=mode,
-                product_smiles=product_smiles,
-                reactant_smiles=reactant_smiles,
-                agents=agents,
-            )
-
-            top_methods = method_prob_df.head(2).reset_index(drop=True)
-
             # TLC prediction is shown first, using the top-ranked method and
             # its top-ranked solvent system.
             if is_other_method(method_pred):
@@ -512,14 +617,6 @@ if predict_clicked:
                     "predicted purification method is Other."
                 )
             else:
-                tlc_solvent_pred, tlc_solvent_prob_df = predictor.predict_solvent(
-                    mode=mode,
-                    method=method_pred,
-                    product_smiles=product_smiles,
-                    reactant_smiles=reactant_smiles,
-                    agents=agents,
-                )
-
                 display_tlc_prediction(
                     mode=mode,
                     solvent=tlc_solvent_pred,
@@ -527,6 +624,7 @@ if predict_clicked:
                     product_smiles=product_smiles,
                     reactant_smiles=reactant_smiles,
                     agents=agents,
+                    ratio_dict=tlc_ratio_dict,
                 )
 
             st.markdown("### Top purification method candidates")
@@ -552,13 +650,17 @@ if predict_clicked:
                     # -------------------------------------------------
                     # 2. Predict solvent probabilities for each method candidate
                     # -------------------------------------------------
-                    solvent_pred, solvent_prob_df = predictor.predict_solvent(
-                        mode=mode,
-                        method=method_candidate,
-                        product_smiles=product_smiles,
-                        reactant_smiles=reactant_smiles,
-                        agents=agents,
-                    )
+                    if method_candidate == method_pred:
+                        solvent_pred = tlc_solvent_pred
+                        solvent_prob_df = tlc_solvent_prob_df
+                    else:
+                        solvent_pred, solvent_prob_df = predictor.predict_solvent(
+                            mode=mode,
+                            method=method_candidate,
+                            product_smiles=product_smiles,
+                            reactant_smiles=reactant_smiles,
+                            agents=agents,
+                        )
 
                     top_solvents = solvent_prob_df.head(2).reset_index(drop=True)
 
@@ -567,6 +669,13 @@ if predict_clicked:
                     for solvent_idx, solvent_row in top_solvents.iterrows():
                         solvent_candidate = solvent_row["candidate"]
                         solvent_probability = float(solvent_row["prob"])
+                        cached_ratio_dict = None
+
+                        if (
+                            method_candidate == method_pred
+                            and solvent_candidate == tlc_solvent_pred
+                        ):
+                            cached_ratio_dict = tlc_ratio_dict
 
                         display_solvent_candidate(
                             mode=mode,
@@ -576,6 +685,7 @@ if predict_clicked:
                             product_smiles=product_smiles,
                             reactant_smiles=reactant_smiles,
                             agents=agents,
+                            ratio_dict=cached_ratio_dict,
                         )
 
                     display_probability_table(
