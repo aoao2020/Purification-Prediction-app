@@ -143,7 +143,7 @@ def smiles_input_with_draw_button(
     )
 
     if draw_col.button(
-        "Draw",
+        "⌬ Draw",
         key=draw_key,
         use_container_width=True,
     ):
@@ -333,6 +333,11 @@ with st.expander("How to use", expanded=False):
     )
 
 st.markdown("## Input")
+
+st.caption(
+    "Not familiar with SMILES? Use the ⌬ Draw button to create a molecular "
+    "structure and automatically fill in the SMILES input."
+)
 
 mode_label = st.radio(
     "Prediction mode",
