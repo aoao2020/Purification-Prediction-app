@@ -219,10 +219,6 @@ def display_ratio_for_silica(solvent, ratio_dict):
         ratio_dict["silica_end"],
     )
 
-    st.markdown(
-        "**Recommended output for predicted method: Silica Column**"
-    )
-
     st.info(f"**Silica start ratio**: {start_compact}")
     st.info(f"**Silica end ratio**: {end_compact}")
 
