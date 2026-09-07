@@ -1,3 +1,4 @@
+# Deployment generation: product-based / reaction-based models
 streamlit==1.45.1
 streamlit-ketcher==0.0.1
 pandas==2.2.3
