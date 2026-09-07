@@ -2,13 +2,14 @@ import joblib
 
 from pathlib import Path
 
-for mode in ["simple", "complex"]:
+for variant, pattern in [
+    ("product-based", "*product_based*.pkl"),
+    ("reaction-based", "*reaction_based*.pkl"),
+]:
 
-    print(f"\n=== {mode} ===")
+    print(f"\n=== {variant} ===")
 
-    model_dir = Path("models") / mode
-
-    for model_path in model_dir.glob("*.pkl"):
+    for model_path in Path("models").glob(pattern):
 
         print("\n" + "=" * 80)
 

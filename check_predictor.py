@@ -60,31 +60,31 @@ def main():
     predictor = PurificationPredictor(root_dir=root_dir)
 
     # -------------------------
-    # Simple mode test
+    # Product-based mode test
     # -------------------------
-    simple_result = predictor.predict_all(
-        mode="simple",
+    product_based_result = predictor.predict_all(
+        mode="product-based",
         product_smiles="CCO",
     )
 
     print_result(
-        mode="simple",
-        result=simple_result,
+        mode="product-based",
+        result=product_based_result,
     )
 
     # -------------------------
-    # Complex mode test
+    # Reaction-based mode test
     # -------------------------
-    complex_result = predictor.predict_all(
-        mode="complex",
+    reaction_based_result = predictor.predict_all(
+        mode="reaction-based",
         reactant_smiles="CC=O",
         product_smiles="CCO",
         agents="DMF, HCl",
     )
 
     print_result(
-        mode="complex",
-        result=complex_result,
+        mode="reaction-based",
+        result=reaction_based_result,
     )
 
     print()

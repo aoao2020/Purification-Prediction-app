@@ -25,13 +25,19 @@ st.set_page_config(
 # Load predictor
 # =====================================================
 
+MODEL_CACHE_VERSION = "product-reaction-v2"
+
+
 @st.cache_resource
-def load_predictor():
+def load_predictor(model_version):
+    # Include the model version in Streamlit's cache key. This prevents a
+    # predictor loaded from the previous model set from surviving a hot reload.
+    del model_version
     root_dir = Path(__file__).resolve().parent
     return PurificationPredictor(root_dir=root_dir)
 
 
-predictor = load_predictor()
+predictor = load_predictor(MODEL_CACHE_VERSION)
 
 
 # =====================================================
@@ -40,7 +46,7 @@ predictor = load_predictor()
 
 METHOD_DISPLAY_MAP = {
     "silica": "Silica Column",
-    "NH silica": "NH Silica Column",
+    "nh silica": "NH Silica Column",
     "reverse phase": "Reverse Phase",
     "other": "Other",
 }
@@ -58,7 +64,7 @@ def clean_text(value):
 
 def display_method_name(method):
     method = str(method).strip()
-    return METHOD_DISPLAY_MAP.get(method, method)
+    return METHOD_DISPLAY_MAP.get(method.lower(), method)
 
 
 def parse_mol(smiles):
@@ -226,6 +232,7 @@ def display_ratio_for_silica(solvent, ratio_dict):
 def display_tlc_prediction(
     *,
     mode,
+    method,
     solvent,
     solvent_probability_df,
     product_smiles,
@@ -255,6 +262,7 @@ def display_tlc_prediction(
                 product_smiles=product_smiles,
                 reactant_smiles=reactant_smiles,
                 agents=agents,
+                method=method,
             )
 
             tlc_ratio = format_ratio(solvent, ratio_dict["tlc"])
@@ -299,6 +307,7 @@ def display_solvent_candidate(
             product_smiles=product_smiles,
             reactant_smiles=reactant_smiles,
             agents=agents,
+            method=method_candidate,
         )
 
         display_ratio_for_silica(
@@ -324,8 +333,8 @@ with st.expander("How to use", expanded=False):
     st.write("3. Click **Predict**.")
     st.write("4. Review top purification method candidates and their solvent candidates.")
     st.info(
-        "Simple mode uses Product SMILES only. "
-        "Complex mode uses Reactant SMILES, Product SMILES, and selected Agents/Reagents."
+        "Product-based mode uses Product SMILES only. "
+        "Reaction-based mode uses Reactant SMILES, Product SMILES, and selected Agents/Reagents."
     )
 
 st.markdown("## Input")
@@ -338,24 +347,24 @@ st.caption(
 mode_label = st.radio(
     "Prediction mode",
     [
-        "Simple mode: Product SMILES only",
-        "Complex mode: Reactant + Product + Agents",
+        "Product-based mode: Product SMILES only",
+        "Reaction-based mode: Reactant + Product + Agents",
     ],
     horizontal=True,
 )
 
-mode = "simple" if mode_label.startswith("Simple") else "complex"
+mode = "product-based" if mode_label.startswith("Product-based") else "reaction-based"
 
 reactant_smiles = ""
 agents = ""
 selected_agents = []
 
-if mode == "simple":
+if mode == "product-based":
     product_smiles = smiles_input_with_draw_button(
         label="Product SMILES",
         input_key="product_smiles_input",
         placeholder="Example: CCO",
-        draw_key="draw_product_simple",
+        draw_key="draw_product_product_based",
         editor_key="product_structure_editor",
     )
 
@@ -367,7 +376,7 @@ else:
             label="Reactant SMILES",
             input_key="reactant_smiles_input",
             placeholder="Example: CC=O",
-            draw_key="draw_reactant_complex",
+            draw_key="draw_reactant_reaction_based",
             editor_key="reactant_structure_editor",
             column_widths=(5, 1.5),
         )
@@ -376,7 +385,7 @@ else:
             label="Product SMILES",
             input_key="product_smiles_input",
             placeholder="Example: CCO",
-            draw_key="draw_product_complex",
+            draw_key="draw_product_reaction_based",
             editor_key="product_structure_editor",
             column_widths=(5, 1.5),
         )
@@ -400,7 +409,7 @@ else:
             st.caption("No agents selected. Agent features will be all zero.")
 
     st.info(
-        "Complex mode uses Reactant SMILES, Product SMILES, and selected Agents/Reagents "
+        "Reaction-based mode uses Reactant SMILES, Product SMILES, and selected Agents/Reagents "
         "to generate model features."
     )
 
@@ -424,9 +433,9 @@ if predict_clicked:
         st.error("Please enter Product SMILES.")
         st.stop()
 
-    if mode == "complex":
+    if mode == "reaction-based":
         if not reactant_smiles:
-            st.error("Please enter Reactant SMILES for Complex mode.")
+            st.error("Please enter Reactant SMILES for Reaction-based mode.")
             st.stop()
 
         if not selected_agents:
@@ -444,7 +453,7 @@ if predict_clicked:
     reactant_mol = None
     canonical_reactant = ""
 
-    if mode == "complex":
+    if mode == "reaction-based":
         reactant_mol, canonical_reactant = parse_mol(reactant_smiles)
 
         if reactant_mol is None:
@@ -459,7 +468,7 @@ if predict_clicked:
         st.write(f"**Mode**: `{mode}`")
         st.write(f"**Canonical Product SMILES**: `{canonical_product}`")
 
-        if mode == "complex":
+        if mode == "reaction-based":
             st.write(f"**Canonical Reactant SMILES**: `{canonical_reactant}`")
             st.write(
                 f"**Selected Agents/Reagents**: "
@@ -477,7 +486,7 @@ if predict_clicked:
         except Exception:
             st.warning("Product molecular structure could not be generated.")
 
-        if mode == "complex":
+        if mode == "reaction-based":
             try:
                 st.image(
                     MolToImage(reactant_mol),
@@ -488,8 +497,6 @@ if predict_clicked:
                 st.warning("Reactant molecular structure could not be generated.")
 
     with right_col:
-        st.subheader("Prediction results")
-
         try:
             # -------------------------------------------------
             # 1. Predict method probabilities
@@ -522,6 +529,7 @@ if predict_clicked:
 
                 display_tlc_prediction(
                     mode=mode,
+                    method=method_pred,
                     solvent=tlc_solvent_pred,
                     solvent_probability_df=tlc_solvent_prob_df,
                     product_smiles=product_smiles,

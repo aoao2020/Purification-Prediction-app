@@ -34,11 +34,28 @@ UNIQUE_METHOD_LIST = [
 
 UNIQUE_SOLVENT_LIST = [
     "EtOAc/Hexane",
-    "H2O/CH3CN",
-    "MeOH/CH2Cl2",
-    "MeOH/CHCl3",
+    "H$_{2}$O/CH$_{3}$CN",
+    "MeOH/CH$_{2}$Cl$_{2}$",
+    "MeOH/CHCl$_{3}$",
     "MeOH/EtOAc",
 ]
+
+METHOD_FEATURE_MAP = {
+    "nh silica": "NH Silica Column",
+    "reverse phase": "Reverse Phase Column",
+    "silica": "Silica Column",
+}
+
+# The replacement models were trained with 2048-bit Morgan fingerprints.
+MORGAN_FP_DIM = 2048
+
+# The reaction-based models contain 413 agent one-hot columns.  Limit the
+# existing reference list to the feature width expected by those models.
+REACTION_AGENT_FEATURE_COUNT = 413
+
+# Ratio models were trained on the two aggregated method labels.  Only the
+# first column (Silica) is used by the current silica-ratio models.
+RATIO_METHOD_LIST = ["Silica", "Other"]
 
 
 # =====================================================
@@ -60,6 +77,7 @@ class PurificationPredictor:
         self.unique_agents = joblib.load(
             self.features_dir / "unique_agent.pkl"
         )
+        self.model_agents = list(self.unique_agents)[:REACTION_AGENT_FEATURE_COUNT]
 
         self.models = {}
 
@@ -71,80 +89,70 @@ class PurificationPredictor:
 
     def _load_models(self):
 
-        self.models["simple"] = {
+        self.models["product-based"] = {
 
             "method":
             joblib.load(
                 self.models_dir
-                / "simple"
-                / "method_LightGBM_morgan_rdkit_simple_model.pkl"
+                / "method_LightGBM_morgan_product_based_model.pkl"
             ),
 
             "solvent":
             joblib.load(
                 self.models_dir
-                / "simple"
-                / "solvent_type_LightGBM_for_imbalance_morgan_method_simple_model.pkl"
+                / "solvent_type_LightGBM_morgan_rdkit_method_product_based_smote_model.pkl"
             ),
 
             "tlc":
             joblib.load(
                 self.models_dir
-                / "simple"
-                / "tlc_solvent_ratio_LightGBM_rdkit_solvent_simple_model.pkl"
+                / "tlc_solvent_ratio_LightGBM_morgan_rdkit_solvent_method_product_based_model.pkl"
             ),
 
             "silica_start":
             joblib.load(
                 self.models_dir
-                / "simple"
-                / "silica_solvent_start_ratio_LightGBM_morgan_rdkit_solvent_simple_model.pkl"
+                / "silica_solvent_initial_ratio_LightGBM_morgan_solvent_method_product_based_model.pkl"
             ),
 
             "silica_end":
             joblib.load(
                 self.models_dir
-                / "simple"
-                / "silica_solvent_end_ratio_LightGBM_rdkit_solvent_simple_model.pkl"
+                / "silica_solvent_final_ratio_LightGBM_rdkit_solvent_method_product_based_model.pkl"
             ),
 
         }
 
-        self.models["complex"] = {
+        self.models["reaction-based"] = {
 
             "method":
             joblib.load(
                 self.models_dir
-                / "complex"
-                / "method_LightGBM_for_imbalance_morgan_agent_complex_model.pkl"
+                / "method_LightGBM_morgan_agent_reaction_based_smote_model.pkl"
             ),
 
             "solvent":
             joblib.load(
                 self.models_dir
-                / "complex"
-                / "solvent_type_LightGBM_for_imbalance_rdkit_agent_method_complex_model.pkl"
+                / "solvent_type_LightGBM_morgan_agent_method_reaction_based_smote_model.pkl"
             ),
 
             "tlc":
             joblib.load(
                 self.models_dir
-                / "complex"
-                / "tlc_solvent_ratio_LightGBM_morgan_rdkit_agent_solvent_complex_model.pkl"
+                / "tlc_solvent_ratio_LightGBM_morgan_rdkit_agent_solvent_method_reaction_based_model.pkl"
             ),
 
             "silica_start":
             joblib.load(
                 self.models_dir
-                / "complex"
-                / "silica_solvent_start_ratio_LightGBM_morgan_agent_solvent_complex_model.pkl"
+                / "silica_solvent_initial_ratio_LightGBM_morgan_agent_solvent_method_reaction_based_model.pkl"
             ),
 
             "silica_end":
             joblib.load(
                 self.models_dir
-                / "complex"
-                / "silica_solvent_end_ratio_LightGBM_rdkit_agent_solvent_complex_model.pkl"
+                / "silica_solvent_final_ratio_LightGBM_rdkit_agent_solvent_method_reaction_based_model.pkl"
             ),
 
         }
@@ -163,6 +171,7 @@ class PurificationPredictor:
         agents="",
         method="",
         solvent="",
+        ref_method_list=None,
     ):
 
         use_agent = "agent" in fea_type
@@ -182,16 +191,16 @@ class PurificationPredictor:
             fp_type="count_morgan",
 
             ref_agents_list=(
-                self.unique_agents
+                self.model_agents
                 if use_agent
                 else None
             ),
 
-            ref_method_list=UNIQUE_METHOD_LIST,
+            ref_method_list=ref_method_list or UNIQUE_METHOD_LIST,
 
             ref_solvent_list=UNIQUE_SOLVENT_LIST,
 
-            fp_dim=1024,
+            fp_dim=MORGAN_FP_DIM,
 
             fea_type=fea_type,
 
@@ -205,30 +214,30 @@ class PurificationPredictor:
 
     def _setting(self, mode):
 
-        if mode == "simple":
+        if mode == "product-based":
 
             return {
 
                 "target": "product",
 
                 "method":
-                "morgan_rdkit",
+                "morgan",
 
                 "solvent":
-                "morgan_method",
+                "morgan_rdkit_method",
 
                 "tlc":
-                "rdkit_solvent",
+                "morgan_rdkit_solvent_method",
 
                 "silica_start":
-                "morgan_rdkit_solvent",
+                "morgan_solvent_method",
 
                 "silica_end":
-                "rdkit_solvent",
+                "rdkit_solvent_method",
 
             }
 
-        elif mode == "complex":
+        elif mode == "reaction-based":
 
             return {
 
@@ -239,16 +248,16 @@ class PurificationPredictor:
                 "morgan_agent",
 
                 "solvent":
-                "rdkit_agent_method",
+                "morgan_agent_method",
 
                 "tlc":
-                "morgan_rdkit_agent_solvent",
+                "morgan_rdkit_agent_solvent_method",
 
                 "silica_start":
-                "morgan_agent_solvent",
+                "morgan_agent_solvent_method",
 
                 "silica_end":
-                "rdkit_agent_solvent",
+                "rdkit_agent_solvent_method",
 
             }
 
@@ -325,6 +334,11 @@ class PurificationPredictor:
 
         model = self.models[mode]["solvent"]
 
+        method_feature = METHOD_FEATURE_MAP.get(
+            str(method).strip().lower(),
+            method,
+        )
+
         X = self._build_X(
 
             mode,
@@ -339,7 +353,7 @@ class PurificationPredictor:
 
             agents,
 
-            method=method,
+            method=method_feature,
 
         )
 
@@ -375,6 +389,7 @@ class PurificationPredictor:
         product_smiles,
         reactant_smiles="",
         agents="",
+        method="",
     ):
 
         setting = self._setting(mode)
@@ -407,7 +422,11 @@ class PurificationPredictor:
 
                 agents,
 
+                method=method,
+
                 solvent=solvent,
+
+                ref_method_list=RATIO_METHOD_LIST,
 
             )
 
@@ -490,6 +509,8 @@ class PurificationPredictor:
                 reactant_smiles,
 
                 agents,
+
+                method=method_pred,
 
             )
 

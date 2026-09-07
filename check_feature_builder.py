@@ -28,11 +28,15 @@ UNIQUE_METHOD_LIST = [
 
 UNIQUE_SOLVENT_LIST = [
     "EtOAc/Hexane",
-    "H2O/CH3CN",
-    "MeOH/CH2Cl2",
-    "MeOH/CHCl3",
+    "H$_{2}$O/CH$_{3}$CN",
+    "MeOH/CH$_{2}$Cl$_{2}$",
+    "MeOH/CHCl$_{3}$",
     "MeOH/EtOAc",
 ]
+
+RATIO_METHOD_LIST = ["Silica", "Other"]
+MORGAN_FP_DIM = 2048
+REACTION_AGENT_FEATURE_COUNT = 413
 
 
 # =========================
@@ -48,91 +52,97 @@ UNIQUE_AGENT_PATH = FEATURES_DIR / "unique_agent.pkl"
 
 MODEL_TEST_CONFIG = {
     # -------------------------
-    # simple models
+    # product-based models
     # -------------------------
-    "simple_method": {
-        "path": MODELS_DIR / "simple" / "method_LightGBM_morgan_rdkit_simple_model.pkl",
-        "fea_type": "morgan_rdkit",
+    "product_based_method": {
+        "path": MODELS_DIR / "method_LightGBM_morgan_product_based_model.pkl",
+        "fea_type": "morgan",
         "target_compound": "product",
         "method": "",
         "solvent": "",
         "use_agents": False,
     },
-    "simple_solvent": {
-        "path": MODELS_DIR / "simple" / "solvent_type_LightGBM_for_imbalance_morgan_method_simple_model.pkl",
-        "fea_type": "morgan_method",
+    "product_based_solvent": {
+        "path": MODELS_DIR / "solvent_type_LightGBM_morgan_rdkit_method_product_based_smote_model.pkl",
+        "fea_type": "morgan_rdkit_method",
         "target_compound": "product",
         "method": "Silica Column",
         "solvent": "",
         "use_agents": False,
     },
-    "simple_tlc_ratio": {
-        "path": MODELS_DIR / "simple" / "tlc_solvent_ratio_LightGBM_rdkit_solvent_simple_model.pkl",
-        "fea_type": "rdkit_solvent",
+    "product_based_tlc_ratio": {
+        "path": MODELS_DIR / "tlc_solvent_ratio_LightGBM_morgan_rdkit_solvent_method_product_based_model.pkl",
+        "fea_type": "morgan_rdkit_solvent_method",
         "target_compound": "product",
         "method": "",
         "solvent": "EtOAc/Hexane",
         "use_agents": False,
+        "ratio_method": True,
     },
-    "simple_silica_start": {
-        "path": MODELS_DIR / "simple" / "silica_solvent_start_ratio_LightGBM_morgan_rdkit_solvent_simple_model.pkl",
-        "fea_type": "morgan_rdkit_solvent",
+    "product_based_silica_start": {
+        "path": MODELS_DIR / "silica_solvent_initial_ratio_LightGBM_morgan_solvent_method_product_based_model.pkl",
+        "fea_type": "morgan_solvent_method",
         "target_compound": "product",
-        "method": "",
+        "method": "Silica",
         "solvent": "EtOAc/Hexane",
         "use_agents": False,
+        "ratio_method": True,
     },
-    "simple_silica_end": {
-        "path": MODELS_DIR / "simple" / "silica_solvent_end_ratio_LightGBM_rdkit_solvent_simple_model.pkl",
-        "fea_type": "rdkit_solvent",
+    "product_based_silica_end": {
+        "path": MODELS_DIR / "silica_solvent_final_ratio_LightGBM_rdkit_solvent_method_product_based_model.pkl",
+        "fea_type": "rdkit_solvent_method",
         "target_compound": "product",
-        "method": "",
+        "method": "Silica",
         "solvent": "EtOAc/Hexane",
         "use_agents": False,
+        "ratio_method": True,
     },
 
     # -------------------------
-    # complex models
+    # reaction-based models
     # -------------------------
-    "complex_method": {
-        "path": MODELS_DIR / "complex" / "method_LightGBM_for_imbalance_morgan_agent_complex_model.pkl",
+    "reaction_based_method": {
+        "path": MODELS_DIR / "method_LightGBM_morgan_agent_reaction_based_smote_model.pkl",
         "fea_type": "morgan_agent",
         "target_compound": "reactant_product",
         "method": "",
         "solvent": "",
         "use_agents": True,
     },
-    "complex_solvent": {
-        "path": MODELS_DIR / "complex" / "solvent_type_LightGBM_for_imbalance_rdkit_agent_method_complex_model.pkl",
-        "fea_type": "rdkit_agent_method",
+    "reaction_based_solvent": {
+        "path": MODELS_DIR / "solvent_type_LightGBM_morgan_agent_method_reaction_based_smote_model.pkl",
+        "fea_type": "morgan_agent_method",
         "target_compound": "reactant_product",
         "method": "Silica Column",
         "solvent": "",
         "use_agents": True,
     },
-    "complex_tlc_ratio": {
-        "path": MODELS_DIR / "complex" / "tlc_solvent_ratio_LightGBM_morgan_rdkit_agent_solvent_complex_model.pkl",
-        "fea_type": "morgan_rdkit_agent_solvent",
+    "reaction_based_tlc_ratio": {
+        "path": MODELS_DIR / "tlc_solvent_ratio_LightGBM_morgan_rdkit_agent_solvent_method_reaction_based_model.pkl",
+        "fea_type": "morgan_rdkit_agent_solvent_method",
         "target_compound": "reactant_product",
         "method": "",
         "solvent": "EtOAc/Hexane",
         "use_agents": True,
+        "ratio_method": True,
     },
-    "complex_silica_start": {
-        "path": MODELS_DIR / "complex" / "silica_solvent_start_ratio_LightGBM_morgan_agent_solvent_complex_model.pkl",
-        "fea_type": "morgan_agent_solvent",
+    "reaction_based_silica_start": {
+        "path": MODELS_DIR / "silica_solvent_initial_ratio_LightGBM_morgan_agent_solvent_method_reaction_based_model.pkl",
+        "fea_type": "morgan_agent_solvent_method",
         "target_compound": "reactant_product",
-        "method": "",
+        "method": "Silica",
         "solvent": "EtOAc/Hexane",
         "use_agents": True,
+        "ratio_method": True,
     },
-    "complex_silica_end": {
-        "path": MODELS_DIR / "complex" / "silica_solvent_end_ratio_LightGBM_rdkit_agent_solvent_complex_model.pkl",
-        "fea_type": "rdkit_agent_solvent",
+    "reaction_based_silica_end": {
+        "path": MODELS_DIR / "silica_solvent_final_ratio_LightGBM_rdkit_agent_solvent_method_reaction_based_model.pkl",
+        "fea_type": "rdkit_agent_solvent_method",
         "target_compound": "reactant_product",
-        "method": "",
+        "method": "Silica",
         "solvent": "EtOAc/Hexane",
         "use_agents": True,
+        "ratio_method": True,
     },
 }
 
@@ -199,7 +209,16 @@ def main():
         model = joblib.load(model_path)
         expected_n_features = get_model_n_features(model)
 
-        ref_agents_list = unique_agents if cfg["use_agents"] else None
+        ref_agents_list = (
+            unique_agents[:REACTION_AGENT_FEATURE_COUNT]
+            if cfg["use_agents"]
+            else None
+        )
+        ref_method_list = (
+            RATIO_METHOD_LIST
+            if cfg.get("ratio_method")
+            else UNIQUE_METHOD_LIST
+        )
 
         try:
             X = build_single_feature_dataframe(
@@ -210,9 +229,9 @@ def main():
                 solvent=cfg["solvent"],
                 fp_type="count_morgan",
                 ref_agents_list=ref_agents_list,
-                ref_method_list=UNIQUE_METHOD_LIST,
+                ref_method_list=ref_method_list,
                 ref_solvent_list=UNIQUE_SOLVENT_LIST,
-                fp_dim=1024,
+                fp_dim=MORGAN_FP_DIM,
                 fea_type=cfg["fea_type"],
                 target_compound=cfg["target_compound"],
             )
