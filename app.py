@@ -26,9 +26,6 @@ st.markdown(
     .st-key-model_selection [data-testid="stRadio"] label p {
         font-size: 1.125rem;
     }
-    .st-key-model_selection [data-testid="stRadio"] [data-testid="stCaptionContainer"] p {
-        font-size: 0.875rem;
-    }
     .st-key-predict_action button {
         min-height: 3.5rem;
         padding: 0.75rem 1.5rem;
@@ -377,7 +374,11 @@ with st.container(key="model_selection"):
             "Product-based model (PBM)",
             "Reaction-based model (RBM)",
         ],
-        captions=["Product only", "Product, Reactant, Agents"],
+        format_func=lambda label: (
+            f"{label}：Product only"
+            if label.startswith("Product-based")
+            else f"{label}：Product, Reactant, Agents"
+        ),
         horizontal=True,
     )
 
