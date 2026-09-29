@@ -23,8 +23,36 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .st-key-model_selection [data-testid="stRadio"] label p {
+    [data-testid="stMarkdownContainer"] p {
         font-size: 1.125rem;
+        line-height: 1.6;
+    }
+    [data-testid="stTextInput"] input {
+        font-size: 1.125rem;
+        min-height: 2.75rem;
+    }
+    [data-testid="stCaptionContainer"] {
+        color: var(--text-color, inherit);
+    }
+    [data-testid="stCaptionContainer"] p {
+        font-size: 1.25rem;
+        line-height: 1.6;
+        margin-bottom: 0.5rem;
+    }
+    .st-key-model_selection [data-testid="stRadio"] label p {
+        font-size: 1.375rem;
+        line-height: 1.5;
+        font-weight: 600;
+    }
+    .st-key-model_selection [role="radiogroup"] {
+        gap: 0.75rem 2rem;
+    }
+    [data-testid="stMainBlockContainer"] {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+    }
+    [data-testid="stMain"] [data-testid="stVerticalBlock"] {
+        gap: 1.25rem;
     }
     .st-key-predict_action button {
         min-height: 3.5rem;
