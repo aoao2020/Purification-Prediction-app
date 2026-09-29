@@ -20,6 +20,37 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    .st-key-model_selection [data-testid="stRadio"] label p {
+        font-size: 1.125rem;
+    }
+    .st-key-model_selection [data-testid="stRadio"] [data-testid="stCaptionContainer"] p {
+        font-size: 0.875rem;
+    }
+    .st-key-predict_action button {
+        min-height: 3.5rem;
+        padding: 0.75rem 1.5rem;
+    }
+    .st-key-predict_action button p {
+        font-size: 1.375rem;
+        font-weight: 700;
+    }
+    [class*="st-key-draw_action_"] button {
+        min-height: 3rem;
+        padding: 0.5rem 1rem;
+        border-width: 2px;
+    }
+    [class*="st-key-draw_action_"] button p {
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 # =====================================================
 # Load predictor
@@ -45,8 +76,8 @@ predictor = load_predictor(MODEL_CACHE_VERSION)
 # =====================================================
 
 METHOD_DISPLAY_MAP = {
-    "silica": "Silica Column",
-    "nh silica": "NH Silica Column",
+    "silica": "Silica",
+    "nh silica": "NH Silica",
     "reverse phase": "Reverse Phase",
     "other": "Other",
 }
@@ -135,7 +166,7 @@ def smiles_input_with_draw_button(
     placeholder,
     draw_key,
     editor_key,
-    column_widths=(7, 1),
+    column_widths=(3, 1),
 ):
     input_col, draw_col = st.columns(
         column_widths,
@@ -143,21 +174,22 @@ def smiles_input_with_draw_button(
     )
 
     smiles = input_col.text_input(
-        label,
+        f"{label} or Draw Button",
         key=input_key,
         placeholder=placeholder,
     )
 
-    if draw_col.button(
-        "⌬ Draw",
-        key=draw_key,
-        use_container_width=True,
-    ):
-        draw_structure_dialog(
-            target_key=input_key,
-            editor_key=editor_key,
-            structure_label=label,
-        )
+    with draw_col.container(key=f"draw_action_{draw_key}"):
+        if st.button(
+            "⌬ Draw",
+            key=draw_key,
+            use_container_width=True,
+        ):
+            draw_structure_dialog(
+                target_key=input_key,
+                editor_key=editor_key,
+                structure_label=label,
+            )
 
     return smiles
 
@@ -239,17 +271,10 @@ def display_tlc_prediction(
     reactant_smiles,
     agents,
 ):
-    st.markdown("### TLC prediction")
-
-    solvent_probability_rows = solvent_probability_df[
-        solvent_probability_df["candidate"] == solvent
-    ]
-    solvent_probability = float(solvent_probability_rows.iloc[0]["prob"])
+    st.markdown("### Predicted TLC Conditions")
 
     with st.container(border=True):
-        st.write(
-            f"**Solvent system**: {solvent} ({solvent_probability:.3f})"
-        )
+        st.write(f"**Solvent system**: {solvent}")
 
         if is_other_solvent(solvent):
             st.warning(
@@ -278,16 +303,17 @@ def display_solvent_candidate(
     *,
     mode,
     method_candidate,
+    candidate_number,
     solvent_candidate,
-    solvent_probability,
     product_smiles,
     reactant_smiles,
     agents,
 ):
     with st.container(border=True):
         st.markdown(
-            f"#### Solvent candidate: {solvent_candidate} ({solvent_probability:.3f})"
+            f"##### Solvent Candidate {candidate_number}"
         )
+        st.write(f"**Solvent system**: {solvent_candidate}")
 
         if is_other_solvent(solvent_candidate):
             st.warning(
@@ -344,14 +370,16 @@ st.caption(
     "structure and automatically fill in the SMILES input."
 )
 
-mode_label = st.radio(
-    "Prediction mode",
-    [
-        "Product-based mode: Product SMILES only",
-        "Reaction-based mode: Reactant + Product + Agents",
-    ],
-    horizontal=True,
-)
+with st.container(key="model_selection"):
+    mode_label = st.radio(
+        "Prediction model",
+        [
+            "Product-based model (PBM)",
+            "Reaction-based model (RBM)",
+        ],
+        captions=["Product only", "Product, Reactant, Agents"],
+        horizontal=True,
+    )
 
 mode = "product-based" if mode_label.startswith("Product-based") else "reaction-based"
 
@@ -378,7 +406,6 @@ else:
             placeholder="Example: CC=O",
             draw_key="draw_reactant_reaction_based",
             editor_key="reactant_structure_editor",
-            column_widths=(5, 1.5),
         )
 
         product_smiles = smiles_input_with_draw_button(
@@ -387,7 +414,6 @@ else:
             placeholder="Example: CCO",
             draw_key="draw_product_reaction_based",
             editor_key="product_structure_editor",
-            column_widths=(5, 1.5),
         )
 
     with col2:
@@ -413,10 +439,12 @@ else:
         "to generate model features."
     )
 
-predict_clicked = st.button(
-    "Predict",
-    use_container_width=True,
-)
+with st.container(key="predict_action"):
+    predict_clicked = st.button(
+        "Predict",
+        type="primary",
+        use_container_width=True,
+    )
 
 
 # =====================================================
@@ -463,19 +491,19 @@ if predict_clicked:
     left_col, right_col = st.columns([1, 2])
 
     with left_col:
-        st.subheader("Input summary")
+        st.subheader("Input Summary")
 
-        st.write(f"**Mode**: `{mode}`")
-        st.write(f"**Canonical Product SMILES**: `{canonical_product}`")
+        st.write(f"**Prediction model**: {mode_label}")
+        st.write(f"**Product SMILES**: `{canonical_product}`")
 
         if mode == "reaction-based":
-            st.write(f"**Canonical Reactant SMILES**: `{canonical_reactant}`")
+            st.write(f"**Reactant SMILES**: `{canonical_reactant}`")
             st.write(
-                f"**Selected Agents/Reagents**: "
+                f"**Agents / Reagents**: "
                 f"{agents if agents else 'Not selected'}"
             )
 
-        st.markdown("### Molecular structure")
+        st.markdown("### Molecular Structure")
 
         try:
             st.image(
@@ -510,10 +538,18 @@ if predict_clicked:
 
             top_methods = method_prob_df.head(2).reset_index(drop=True)
 
+            st.markdown(
+                f"### Predicted Chromatography Method：{display_method_name(method_pred)}"
+            )
+            display_probability_table(
+                title="Purification method",
+                df=method_prob_df,
+            )
+
             # TLC prediction is shown first, using the top-ranked method and
             # its top-ranked solvent system.
             if is_other_method(method_pred):
-                st.markdown("### TLC prediction")
+                st.markdown("### Predicted TLC Conditions")
                 st.warning(
                     "TLC and solvent prediction are unavailable when the "
                     "predicted purification method is Other."
@@ -537,17 +573,15 @@ if predict_clicked:
                     agents=agents,
                 )
 
-            st.markdown("### Top purification method candidates")
+            st.markdown("### Predicted CC Conditions")
 
             for method_idx, method_row in top_methods.iterrows():
                 method_candidate = method_row["candidate"]
-                method_probability = float(method_row["prob"])
                 method_display = display_method_name(method_candidate)
 
-                with st.container(border=True):
+                with st.container():
                     st.markdown(
-                        f"## Method candidate {method_idx + 1}: "
-                        f"{method_display} ({method_probability:.3f})"
+                        f"#### Method Candidate {method_idx + 1}：{method_display}"
                     )
 
                     if is_other_method(method_candidate):
@@ -570,17 +604,14 @@ if predict_clicked:
 
                     top_solvents = solvent_prob_df.head(2).reset_index(drop=True)
 
-                    st.markdown("### Solvent system candidates")
-
                     for solvent_idx, solvent_row in top_solvents.iterrows():
                         solvent_candidate = solvent_row["candidate"]
-                        solvent_probability = float(solvent_row["prob"])
 
                         display_solvent_candidate(
                             mode=mode,
                             method_candidate=method_candidate,
+                            candidate_number=solvent_idx + 1,
                             solvent_candidate=solvent_candidate,
-                            solvent_probability=solvent_probability,
                             product_smiles=product_smiles,
                             reactant_smiles=reactant_smiles,
                             agents=agents,
@@ -593,31 +624,26 @@ if predict_clicked:
 
             st.markdown("---")
 
-            display_probability_table(
-                title="Purification method",
-                df=method_prob_df,
-            )
-
             with st.expander("Notes"):
-                st.write(
+                st.caption(
                     "Purification method candidates are shown up to top 2."
                 )
-                st.write(
+                st.caption(
                     "For each method candidate, solvent system candidates are predicted separately."
                 )
-                st.write(
+                st.caption(
                     "Solvent and TLC predictions are not available when the predicted method is Other."
                 )
-                st.write(
+                st.caption(
                     "Silica start and end ratios are displayed only when the predicted method is Silica Column."
                 )
-                st.write(
+                st.caption(
                     'Ratio prediction is not displayed for "other" solvent systems.'
                 )
-                st.write(
+                st.caption(
                     "The TLC solvent ratio uses the top solvent system predicted for the top purification method."
                 )
-                st.write(
+                st.caption(
                     "Solvent ratios are displayed as A:B = x:y. "
                     "For example, EtOAc:Hexane = 40:60 means EtOAc 40% and Hexane 60%."
                 )
