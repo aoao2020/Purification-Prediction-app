@@ -15,7 +15,7 @@ from src.predictor import PurificationPredictor
 # =====================================================
 
 st.set_page_config(
-    page_title="Purification Condition Prediction App",
+    page_title="Purification Condition Predictor",
     page_icon="🧪",
     layout="wide",
 )
@@ -199,7 +199,8 @@ def smiles_input_with_draw_button(
     )
 
     smiles = input_col.text_input(
-        f"{label} or Draw Button",
+        f"{label} (Not familiar with SMILES? Use the ⌬ Draw button to create "
+        "a molecular structure and automatically fill in the SMILES input.)",
         key=input_key,
         placeholder=placeholder,
     )
@@ -371,10 +372,10 @@ def display_solvent_candidate(
 # UI
 # =====================================================
 
-st.title("🧪 Purification Condition Prediction App")
+st.title("🧪 Purification Condition Predictor")
 
 st.caption(
-    "Predict purification method candidates, solvent system candidates, "
+    "Predict candidates of purification method solvent, "
     "and solvent ratios from molecular information."
 )
 
@@ -390,11 +391,6 @@ with st.expander("How to use", expanded=False):
 
 st.markdown("## Input")
 
-st.caption(
-    "Not familiar with SMILES? Use the ⌬ Draw button to create a molecular "
-    "structure and automatically fill in the SMILES input."
-)
-
 with st.container(key="model_selection"):
     mode_label = st.radio(
         "Prediction model",
@@ -405,7 +401,7 @@ with st.container(key="model_selection"):
         format_func=lambda label: (
             f"{label}：Product only"
             if label.startswith("Product-based")
-            else f"{label}：Product, Reactant, Agents"
+            else f"{label}：Product, Reactant, and Agents"
         ),
         horizontal=True,
     )
@@ -653,28 +649,24 @@ if predict_clicked:
 
             st.markdown("---")
 
-            with st.expander("Notes"):
+            with st.expander("How to read the results"):
                 st.caption(
-                    "Purification method candidates are shown up to top 2."
+                    "**Candidate ranking:** Up to two chromatography methods are shown, "
+                    "with up to two solvent systems predicted separately for each method. "
+                    "Candidates are ranked by model probability; see the probability tables for details."
                 )
                 st.caption(
-                    "For each method candidate, solvent system candidates are predicted separately."
+                    "**TLC conditions:** The TLC result uses the highest-ranked chromatography "
+                    "method and its highest-ranked solvent system."
                 )
                 st.caption(
-                    "Solvent and TLC predictions are not available when the predicted method is Other."
+                    "**CC conditions:** Start and end solvent ratios are available only for Silica. "
+                    'Solvent ratios are unavailable for solvent systems labeled "Other". '
+                    'Methods labeled "Other" have no solvent or TLC predictions.'
                 )
                 st.caption(
-                    "Silica start and end ratios are displayed only when the predicted method is Silica Column."
-                )
-                st.caption(
-                    'Ratio prediction is not displayed for "other" solvent systems.'
-                )
-                st.caption(
-                    "The TLC solvent ratio uses the top solvent system predicted for the top purification method."
-                )
-                st.caption(
-                    "Solvent ratios are displayed as A:B = x:y. "
-                    "For example, EtOAc:Hexane = 40:60 means EtOAc 40% and Hexane 60%."
+                    "**Reading solvent ratios:** A:B = x:y gives the proportion of each solvent. "
+                    "For example, EtOAc:Hexane = 40:60 means 40% EtOAc and 60% Hexane."
                 )
 
         except Exception as e:
