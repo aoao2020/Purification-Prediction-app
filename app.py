@@ -1,6 +1,7 @@
 # app.py
 
 from pathlib import Path
+import re
 
 import streamlit as st
 from rdkit import Chem
@@ -220,6 +221,10 @@ def smiles_input_with_draw_button(
     return smiles
 
 
+def display_solvent_name(solvent):
+    return re.sub(r"\$[_*]\{(\d+)\}\$", r"\1", str(solvent))
+
+
 def split_solvent_pair(solvent):
     if "/" in str(solvent):
         left, right = str(solvent).split("/", 1)
@@ -229,7 +234,7 @@ def split_solvent_pair(solvent):
 
 
 def format_ratio(solvent, value):
-    left, right = split_solvent_pair(solvent)
+    left, right = split_solvent_pair(display_solvent_name(solvent))
 
     value = float(value)
     value = max(0.0, min(100.0, value))
@@ -258,6 +263,7 @@ def display_probability_table(title, df, top_n=None):
             show_df = show_df.head(top_n)
 
         show_df["prob"] = show_df["prob"].map(lambda x: round(float(x), 4))
+        show_df["candidate"] = show_df["candidate"].map(display_solvent_name)
         show_df = show_df.rename(
             columns={
                 "candidate": "Candidate",
@@ -300,7 +306,7 @@ def display_tlc_prediction(
     st.markdown("### Predicted TLC Conditions")
 
     with st.container(border=True):
-        st.write(f"**Solvent system**: {solvent}")
+        st.write(f"**Solvent system**: {display_solvent_name(solvent)}")
 
         if is_other_solvent(solvent):
             st.warning(
@@ -339,7 +345,7 @@ def display_solvent_candidate(
         st.markdown(
             f"##### Solvent Candidate {candidate_number}"
         )
-        st.write(f"**Solvent system**: {solvent_candidate}")
+        st.write(f"**Solvent system**: {display_solvent_name(solvent_candidate)}")
 
         if is_other_solvent(solvent_candidate):
             st.warning(
