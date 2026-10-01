@@ -24,26 +24,44 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    /* Respect the browser font size; rem values scale from this base. */
+    html { font-size: 100%; }
+    [data-testid="stHeading"] h1 { font-size: 2.875rem; }
+    [data-testid="stHeading"] h2 { font-size: 2.375rem; }
+    [data-testid="stHeading"] h3 { font-size: 1.875rem; }
+    [data-testid="stHeading"] h4 { font-size: 1.625rem; }
+    [data-testid="stHeading"] h5 { font-size: 1.375rem; }
+    [data-testid="stHeading"] h6 { font-size: 1.125rem; }
     [data-testid="stMarkdownContainer"] p {
-        font-size: 1.125rem;
+        font-size: 1.25rem;
         line-height: 1.6;
     }
     [data-testid="stTextInput"] input {
-        font-size: 1.125rem;
+        font-size: 1.25rem;
         min-height: 2.75rem;
     }
     [data-testid="stCaptionContainer"] {
         color: var(--text-color, inherit);
     }
     [data-testid="stCaptionContainer"] p {
-        font-size: 1.25rem;
+        font-size: 1.375rem;
         line-height: 1.6;
         margin-bottom: 0.5rem;
     }
     .st-key-model_selection [data-testid="stRadio"] label p {
-        font-size: 1.375rem;
+        font-size: 1.5rem;
         line-height: 1.5;
         font-weight: 600;
+        margin: 0;
+    }
+    .st-key-model_selection label[data-baseweb="radio"] {
+        align-items: center;
+    }
+    .st-key-model_selection label[data-baseweb="radio"] > div:first-child {
+        margin-top: 0;
+    }
+    .st-key-model_selection label[data-baseweb="radio"] > div:last-child {
+        top: 0;
     }
     .st-key-model_selection [role="radiogroup"] {
         gap: 0.75rem 2rem;
@@ -60,7 +78,7 @@ st.markdown(
         padding: 0.75rem 1.5rem;
     }
     .st-key-predict_action button p {
-        font-size: 1.375rem;
+        font-size: 1.5rem;
         font-weight: 700;
     }
     [class*="st-key-draw_action_"] button {
@@ -69,7 +87,7 @@ st.markdown(
         border-width: 2px;
     }
     [class*="st-key-draw_action_"] button p {
-        font-size: 1.125rem;
+        font-size: 1.25rem;
         font-weight: 600;
     }
     </style>
@@ -201,7 +219,7 @@ def smiles_input_with_draw_button(
 
     smiles = input_col.text_input(
         f"{label} (Not familiar with SMILES? Use the ⌬ Draw button to create "
-        "a molecular structure and automatically fill in the SMILES input.)",
+        "a molecular structure.)",
         key=input_key,
         placeholder=placeholder,
     )
@@ -379,11 +397,6 @@ def display_solvent_candidate(
 # =====================================================
 
 st.title("🧪 Purification Condition Predictor")
-
-st.caption(
-    "Predict candidates of purification method solvent, "
-    "and solvent ratios from molecular information."
-)
 
 with st.expander("How to use", expanded=False):
     st.write("1. Select a prediction mode.")
