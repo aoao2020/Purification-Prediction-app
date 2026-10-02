@@ -343,10 +343,11 @@ def display_tlc_prediction(
             tlc_ratio = format_ratio(solvent, ratio_dict["tlc"])
             st.info(f"**Predicted TLC solvent ratio**: {tlc_ratio}")
 
-    display_probability_table(
-        title="TLC solvent system",
-        df=solvent_probability_df,
-    )
+    if solvent_probability_df is not None:
+        display_probability_table(
+            title="TLC solvent system",
+            df=solvent_probability_df,
+        )
 
 
 def display_solvent_candidate(
@@ -362,6 +363,7 @@ def display_solvent_candidate(
     with st.container(border=True):
         st.markdown(
             f"##### Solvent Candidate {candidate_number}"
+            if candidate_number is not None else "##### Selected Solvent"
         )
         st.write(f"**Solvent system**: {display_solvent_name(solvent_candidate)}")
 
@@ -392,6 +394,40 @@ def display_solvent_candidate(
         )
 
 
+def display_custom_prediction(*, mode, method, solvent, product_smiles,
+                              reactant_smiles, agents):
+    inputs = dict(mode=mode, product_smiles=product_smiles,
+                  reactant_smiles=reactant_smiles, agents=agents)
+    st.markdown(f"### Selected Chromatography Method：{display_method_name(method)}")
+    solvent_df = None
+    if solvent is None:
+        tlc_solvent, solvent_df = predictor.predict_solvent(method=method, **inputs)
+        solvents = list(solvent_df.head(2)["candidate"])
+    else:
+        tlc_solvent = solvent
+        solvents = [solvent]
+
+    display_tlc_prediction(
+        method=method, solvent=tlc_solvent,
+        solvent_probability_df=solvent_df, **inputs,
+    )
+    st.markdown("### Predicted CC Conditions")
+    for index, candidate in enumerate(solvents, start=1):
+        display_solvent_candidate(
+            method_candidate=method,
+            candidate_number=index if solvent is None else None,
+            solvent_candidate=candidate, **inputs,
+        )
+    if solvent_df is not None:
+        display_probability_table(title="CC solvent system", df=solvent_df)
+    st.caption(
+        "The selected method and solvent are used as fixed inputs. "
+        "When no solvent is selected, TLC uses the highest-ranked solvent system. "
+        "The CC gradient is described by the Silica start and end ratios; "
+        "gradient duration and flow rate are not predicted."
+    )
+
+
 # =====================================================
 # UI
 # =====================================================
@@ -408,7 +444,13 @@ with st.expander("How to use", expanded=False):
         "Reaction-based mode uses Reactant SMILES, Product SMILES, and selected Agents/Reagents."
     )
 
-st.markdown("## Input")
+advanced_mode = st.toggle(
+    "Advanced options — select your own Method / Solvent",
+    key="advanced_mode",
+    help="Use a known method to predict solvents, or specify both to predict ratios.",
+)
+
+st.markdown("## Advanced Input" if advanced_mode else "## Input")
 
 with st.container(key="model_selection"):
     mode_label = st.radio(
@@ -426,6 +468,33 @@ with st.container(key="model_selection"):
     )
 
 mode = "product-based" if mode_label.startswith("Product-based") else "reaction-based"
+
+selected_method = None
+selected_solvent = None
+if advanced_mode:
+    st.caption(
+        "Select a Method to predict solvent candidates and ratios. "
+        "Optionally select a Solvent to predict only ratios. "
+        "CC start and end ratios are available only for Silica."
+    )
+    method_col, solvent_col = st.columns(2)
+    selected_method = method_col.selectbox(
+        "Method", key="custom_method",
+        options=[m for m in predictor.models[mode]["method"].classes_
+                 if not is_other_method(m)],
+        index=None, placeholder="Select a chromatography method",
+        format_func=display_method_name,
+    )
+    solvent_choice = solvent_col.selectbox(
+        "Solvent (optional)", key="custom_solvent",
+        options=[None] + [s for s in predictor.models[mode]["solvent"].classes_
+                          if not is_other_solvent(s)],
+        format_func=lambda value: "Predict solvent automatically" if value is None
+        else display_solvent_name(value),
+        disabled=selected_method is None,
+    )
+    if selected_method is not None:
+        selected_solvent = solvent_choice
 
 reactant_smiles = ""
 agents = ""
@@ -497,6 +566,10 @@ with st.container(key="predict_action"):
 
 if predict_clicked:
 
+    if advanced_mode and selected_method is None:
+        st.error("Please select a Method for advanced prediction.")
+        st.stop()
+
     product_smiles = clean_text(product_smiles)
     reactant_smiles = clean_text(reactant_smiles)
     agents = clean_text(agents)
@@ -538,6 +611,11 @@ if predict_clicked:
         st.subheader("Input Summary")
 
         st.write(f"**Prediction model**: {mode_label}")
+        if advanced_mode:
+            st.write(f"**Selected Method**: {display_method_name(selected_method)}")
+            st.write(
+                f"**Solvent**: {display_solvent_name(selected_solvent) if selected_solvent is not None else 'Predict automatically'}"
+            )
         st.write(f"**Product SMILES**: `{canonical_product}`")
 
         if mode == "reaction-based":
@@ -570,6 +648,14 @@ if predict_clicked:
 
     with right_col:
         try:
+            if advanced_mode:
+                display_custom_prediction(
+                    mode=mode, method=selected_method, solvent=selected_solvent,
+                    product_smiles=product_smiles,
+                    reactant_smiles=reactant_smiles, agents=agents,
+                )
+                st.stop()
+
             # -------------------------------------------------
             # 1. Predict method probabilities
             # -------------------------------------------------
